@@ -1,7 +1,8 @@
 ## Live YOLO Streamlit Demo
 
 ### Reference  
-https://github.com/rampal-punia/yolov8-streamlit-detection-tracking
+https://github.com/rampal-punia/yolov8-streamlit-detection-tracking  
+
 
 ### Requirements  
 ```
@@ -20,3 +21,9 @@ conda activate streamlit_yolo
 ```
 streamlit run app.py
 ```
+
+**Sample video source**  
+https://www.youtube.com/watch?v=IDOhu_cfG_Q  
+
+**Sample youtube source**  
+https://youtu.be/Wp74i9_tnls?si=ZTwEzR-mTydTvoku

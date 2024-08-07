@@ -1,0 +1,7 @@
+opencv-python
+#torch
+#torchvision
+ultralytics
+streamlit
+pytube
+yt_dlp
