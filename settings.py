@@ -22,8 +22,8 @@ SOURCES_LIST = [IMAGE, VIDEO, WEBCAM, RTSP, YOUTUBE]
 
 # Images config
 IMAGES_DIR = ROOT / 'images'
-DEFAULT_IMAGE = IMAGES_DIR / 'office_4.jpg'
-DEFAULT_DETECT_IMAGE = IMAGES_DIR / 'office_4_detected.jpg'
+DEFAULT_IMAGE = IMAGES_DIR / 'helmet.jpg'
+DEFAULT_DETECT_IMAGE = IMAGES_DIR / 'helmet_detected.jpg'
 
 # Videos config
 VIDEO_DIR = ROOT / 'videos'
@@ -33,7 +33,8 @@ VIDEOS_DICT = {
 
 # ML Model config
 MODEL_DIR = ROOT / 'weights'
-DETECTION_MODEL = MODEL_DIR / 'helmet_v8_s.pt'
+DETECTION_MODEL_PERSON = MODEL_DIR / 'yolov8l.pt'
+DETECTION_MODEL_HELMET = MODEL_DIR / 'helmetv8_v5_l.pt'
 # In case of your custome model comment out the line above and
 # Place your custom model pt file name at the line below 
 # DETECTION_MODEL = MODEL_DIR / 'my_detection_model.pt'
