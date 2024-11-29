@@ -1,4 +1,5 @@
 from ultralytics import YOLO
+from check_rule import check_location
 import streamlit as st
 import cv2
 import time
@@ -6,7 +7,7 @@ import yt_dlp
 import settings
 
 
-def load_model(model_path):
+def load_model(model_path_person, model_path_helmet):
     """
     Loads a YOLO object detection model from the specified model_path.
 
@@ -16,8 +17,9 @@ def load_model(model_path):
     Returns:
         A YOLO object detection model.
     """
-    model = YOLO(model_path)
-    return model
+    model_path_person = YOLO(model_path_person)
+    model_path_helmet = YOLO(model_path_helmet)
+    return model_path_person, model_path_helmet
 
 
 def display_tracker_options():
@@ -29,7 +31,7 @@ def display_tracker_options():
     return is_display_tracker, None
 
 
-def _display_detected_frames(conf, model, st_frame, st_text, st_md_list, image, is_display_tracking=None, tracker=None):
+def _display_detected_frames(conf, model_person, model_helmet, st_frame, st_text, st_md_list, image, is_display_tracking=None, tracker=None):
     """
     Display the detected objects on a video frame using the YOLOv8 model.
 
@@ -43,20 +45,26 @@ def _display_detected_frames(conf, model, st_frame, st_text, st_md_list, image, 
     Returns:
     None
     """
-    class_count = [0, 0, 0, 0, 0]
+    class_count = [0, 0, 0, 0, 0, 0]
     # Resize the image to a standard size
     image = cv2.resize(image, (720, int(720*(9/16))))
 
-    # Display object tracking, if specified
-    if is_display_tracking:
-        res = model.track(image, conf=conf, persist=True, tracker=tracker)
-    else:
-        # Predict the objects in the image using the YOLOv8 model
-        res = model.predict(image, conf=conf)
+    # is_display_tracking = False
+
+    # # Display object tracking, if specified
+    # if is_display_tracking:
+    #     res = model.track(image, conf=conf, persist=True, tracker=tracker)
+    # else:
+    #     # Predict the objects in the image using the YOLOv8 model
+    res_person = model_person.predict(image, conf=conf, iou=0.35, classes=[0])
+    res_helmet = model_helmet.predict(image, conf=conf, iou=0.8)
 
     # # Plot the detected objects on the video frame
-    res_plotted = res[0].plot()
-    st_frame.image(res_plotted,
+    res_person_plotted = res_person[0].plot()
+    res_helmet_plotted = res_helmet[0].plot()
+
+    plot_blended = cv2.addWeighted(res_person_plotted, 0.5, res_helmet_plotted, 0.5, 0)
+    st_frame.image(plot_blended,
                    caption='Detected Video',
                    channels="BGR",
                    use_column_width=True
@@ -65,32 +73,42 @@ def _display_detected_frames(conf, model, st_frame, st_text, st_md_list, image, 
     # print('class : ', res[0].boxes.cls)
     try:
         with st.expander("Detection Results"):
-            boxes = res[0].boxes
-            for box in boxes:
-                box_class = box.cls
-                # 0: blue, 1: red, 2: white, 3: yellow, 4: person
-                if 0 in box_class:
-                    class_count[0] += 1
-                if 1 in box_class:
-                    class_count[1] += 1
-                if 2 in box_class:
-                    class_count[2] += 1
-                if 3 in box_class:
-                    class_count[3] += 1
-                if 4 in box_class: 
+            boxes_person = res_person[0].boxes
+            boxes_helmet = res_helmet[0].boxes
+            boxes_p_list, boxes_h_list = [], []
+            for box_p in boxes_person:                    
+                if 0 in box_p.cls: 
+                    # 0: person
                     class_count[4] += 1
-                # st_text.markdown(f"### Person : {class_count[4]}")
-                # st_md_list[0].markdown(f"### blue : {class_count[0]}")
-                # st_md_list[1].markdown(f"### red : {class_count[1]}")
-                # st_md_list[2].markdown(f"### white : {class_count[2]}")
-                # st_md_list[3].markdown(f"### yellow : {class_count[3]}")
-                st_text.markdown("<h2 style='color: black; font-size: 35px;'>Person : {}</h2>".format(class_count[4]), unsafe_allow_html=True)
-                st_md_list[0].markdown("<h3 style='color: blue; font-size: 30px;'>blue : {}</h3>".format(class_count[0]), unsafe_allow_html=True)
-                st_md_list[1].markdown("<h3 style='color: red; font-size: 30px;'>red : {}</h3>".format(class_count[1]), unsafe_allow_html=True)
-                st_md_list[2].markdown("<h3 style='color: lightgray; font-size: 30px;'>white : {}</h3>".format(class_count[2]), unsafe_allow_html=True)
-                st_md_list[3].markdown("<h3 style='color: #FFD700; font-size: 30px;'>yellow : {}</h3>".format(class_count[3]), unsafe_allow_html=True)
+                boxes_p_list.append(box_p.xywh)
+            for box_h in boxes_helmet:
+                # 0: blue, 1: red, 2: white, 3: yellow
+                if 0 in box_h.cls:
+                    class_count[0] += 1
+                if 1 in box_h.cls:
+                    class_count[1] += 1
+                if 2 in box_h.cls:
+                    class_count[2] += 1
+                if 3 in box_h.cls:
+                    class_count[3] += 1    
+                boxes_h_list.append(box_h.xywh)                                    
+            helmeted_person = check_location(boxes_p_list, boxes_h_list)
+            class_count[5] = helmeted_person
+            st_text[0].markdown("<h2 style='color: black; font-size: 35px;'>Person : {}</h2>".format(class_count[4]), unsafe_allow_html=True)
+            st_text[1].markdown("<h2 style='color: black; font-size: 35px;'>Helmeted Person : {}</h2>".format(class_count[5]), unsafe_allow_html=True)
+            st_md_list[0].markdown("<h3 style='color: blue; font-size: 30px;'>blue : {}</h3>".format(class_count[0]), unsafe_allow_html=True)
+            st_md_list[1].markdown("<h3 style='color: red; font-size: 30px;'>red : {}</h3>".format(class_count[1]), unsafe_allow_html=True)
+            st_md_list[2].markdown("<h3 style='color: lightgray; font-size: 30px;'>white : {}</h3>".format(class_count[2]), unsafe_allow_html=True)
+            st_md_list[3].markdown("<h3 style='color: #FFD700; font-size: 30px;'>yellow : {}</h3>".format(class_count[3]), unsafe_allow_html=True)
     except Exception as ex:
-        st.write("Nothing Detected")
+        print(ex)
+        st_text[0].markdown("<h2 style='color: black; font-size: 35px;'>Person : {}</h2>".format(class_count[4]), unsafe_allow_html=True)
+        st_text[1].markdown("<h2 style='color: black; font-size: 35px;'>Helmeted Person : {}</h2>".format(class_count[5]), unsafe_allow_html=True)
+        st_md_list[0].markdown("<h3 style='color: blue; font-size: 30px;'>blue : {}</h3>".format(class_count[0]), unsafe_allow_html=True)
+        st_md_list[1].markdown("<h3 style='color: red; font-size: 30px;'>red : {}</h3>".format(class_count[1]), unsafe_allow_html=True)
+        st_md_list[2].markdown("<h3 style='color: lightgray; font-size: 30px;'>white : {}</h3>".format(class_count[2]), unsafe_allow_html=True)
+        st_md_list[3].markdown("<h3 style='color: #FFD700; font-size: 30px;'>yellow : {}</h3>".format(class_count[3]), unsafe_allow_html=True)
+        pass # st.write("Nothing Detected")
 
 
 
@@ -211,7 +229,7 @@ def play_rtsp_stream(conf, model):
             st.sidebar.error("Error loading RTSP stream: " + str(e))
 
 
-def play_webcam(conf, model):
+def play_webcam(conf, model_person, model_helmet):
     """
     Plays a webcam stream. Detects Objects in real-time using the YOLOv8 object detection model.
 
@@ -231,7 +249,11 @@ def play_webcam(conf, model):
         try:
             vid_cap = cv2.VideoCapture(source_webcam)
             st_frame = st.empty()
-            st_text = st.empty()
+            col1_t, col2_t = st.columns(2)
+            with col1_t:
+                st_text1 = st.empty()
+            with col2_t:
+                st_text2 = st.empty()
 
             col1, col2 = st.columns(2)
             with col1:
@@ -245,9 +267,10 @@ def play_webcam(conf, model):
                 success, image = vid_cap.read()
                 if success:
                     _display_detected_frames(conf,
-                                             model,
+                                             model_person, 
+                                             model_helmet,
                                              st_frame,
-                                             st_text,
+                                             [st_text1, st_text2],
                                              [st_md11, st_md12, st_md21, st_md22],
                                              image,
                                              is_display_tracker,
@@ -260,7 +283,7 @@ def play_webcam(conf, model):
             st.sidebar.error("Error loading video: " + str(e))
 
 
-def play_stored_video(conf, model):
+def play_stored_video(conf, model_person, model_helmet):
     """
     Plays a stored video file. Tracks and detects objects in real-time using the YOLOv8 object detection model.
 
@@ -293,7 +316,11 @@ def play_stored_video(conf, model):
             frame_interval = 1 / fps
 
             st_frame = st.empty()
-            st_text = st.empty()
+            col1_t, col2_t = st.columns(2)
+            with col1_t:
+                st_text1 = st.empty()
+            with col2_t:
+                st_text2 = st.empty()
 
             col1, col2 = st.columns(2)
             with col1:
@@ -310,9 +337,10 @@ def play_stored_video(conf, model):
                 success, image = vid_cap.read()
                 if success:
                     _display_detected_frames(conf,
-                                             model,
+                                             model_person, 
+                                             model_helmet,
                                              st_frame,
-                                             st_text,
+                                             [st_text1, st_text2],
                                              [st_md11, st_md12, st_md21, st_md22],
                                              image,
                                              is_display_tracker,
